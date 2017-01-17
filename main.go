@@ -16,7 +16,7 @@ import (
 func main()  {
 	l, err := os.OpenFile("38popingaev.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 	if err != nil {
-		fmt.Println("error opening log file: %v", err)
+		fmt.Println(err)
 	}
 	defer l.Close()
 
@@ -46,8 +46,6 @@ Example:
 		for  _, ip := range os.Args[2:] {
 			p.Args = append(p.Args, ip)
 		}
-
-		fmt.Print("Args: ",p.Args)
 
 		err = p.Start()
 		if err != nil {
