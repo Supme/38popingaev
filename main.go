@@ -11,7 +11,10 @@ import (
 	"os/exec"
 	"strconv"
 	"bufio"
+	"sync"
 )
+
+var wg sync.WaitGroup
 
 func main()  {
 	l, err := os.OpenFile("38popingaev.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
@@ -26,7 +29,7 @@ func main()  {
 	log.SetOutput(ml)
 
 	if len(os.Args) == 1 {
-		fmt.Println(`38 Popingaev (C)Supme 2017
+		fmt.Println(`38poPINGaev v0.2 (C)Supme 2017
 Example:
 	38popingaev 192.168.1.1 8.8.8.8 127.0.0.1
 	38popingaev start 192.168.1.1 8.8.8.8 127.0.0.1
@@ -88,7 +91,7 @@ Example:
 			os.Exit(1)
 		}
 		os.Remove("pid")
-		log.Printf("Stop 38popingaev demon\n")
+		log.Print("Stop 38popingaev demon\n")
 		os.Exit(0)
 	}
 
@@ -99,35 +102,39 @@ Example:
 				fmt.Println(err)
 				os.Exit(1)
 			}
+			wg.Add(1)
 			go pinger(ra)
 		}
 	}
-
-	for {}
+	wg.Wait()
+	os.Exit(1)
 }
 
 func pinger(ip *net.IPAddr) {
+	defer wg.Done()
 	var lp bool
 	p := fastping.NewPinger()
 	p.AddIPAddr(ip)
+	var ok bool
+	p.OnRecv = func(addr *net.IPAddr, rtt time.Duration) {
+		fmt.Printf("IP Addr: %s receive, RTT: %v\n", addr.String(), rtt)
+		ok = true
+	}
+	p.OnIdle = func() {
+		if lp != ok {
+			lp = ok
+			log.Printf("IP Addr: %s %t", ip.String(), ok)
+		}
+		if !ok {
+			fmt.Printf("IP Addr: %s ping timeout\n", ip.String())
+		}
+	}
 	for {
-		var ok bool = false
-		p.OnRecv = func(addr *net.IPAddr, rtt time.Duration) {
-			fmt.Printf("IP Addr: %s receive, RTT: %v\n", addr.String(), rtt)
-			ok = true
-		}
-		p.OnIdle = func() {
-			if lp != ok {
-				lp = ok
-				log.Printf("IP Addr: %s %t", ip.String(), ok)
-			}
-			if !ok {
-				fmt.Printf("IP Addr: %s ping timeout\n", ip.String())
-			}
-		}
+		ok = false
 		err := p.Run()
 		if err != nil {
-			fmt.Println(err)
+			log.Print(err)
+			return
 		}
 		time.Sleep(time.Second)
 	}
